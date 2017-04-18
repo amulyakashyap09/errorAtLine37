@@ -1,0 +1,60 @@
+"use strict";
+const apn = require('apn');
+
+const sendPushNotificationIos = (certificate, keyId, teamId, deviceToken) {
+
+    return Promise.coroutine(
+        function*() {
+
+            let options = {
+                token: {
+                    key: certificate, //pem certificate (.p8 as extension) 
+                    keyId: keyId,
+                    teamId: teamId
+                },
+                production: false //set production : true when required or in production/live nevironment
+            };
+            let apnProvider = new apn.Provider(options); // Receiver deviceToken 
+
+            let notification = new apn.Notification();
+
+            notification.expiry = Math.floor(Date.now() / 1000) + 24 * 3600; // will expire in 24 hours from now 
+            notification.badge = 2;
+            notification.sound = "ping.aiff";
+            notification.alert = "Hello from Amulya kashyap";
+            notification.payload = {
+                'messageFrom': 'Amulya kashyap'
+            };
+            notification.topic = "Testing notification"; // Send notification topic / title
+            let result = yield apnProvider.send(notification, deviceToken);
+            /*
+            	-----------SENT -------- 
+            	{
+            		device: "834c8b48e6254e47435d74720b1d4a13e3e57d0bf318333c284c1db8ce8ddc58",
+  					status: "410"
+  				}
+  				------------FAILED -----------
+				{
+  					device: "834c8b48e6254e47435d74720b1d4a13e3e57d0bf318333c284c1db8ce8ddc58",
+  					status: "410",
+  					response: {
+    					reason: "Unregistered"
+  					}
+				}
+            */
+            apnProvider.shutdown(); // shutdown apns connection
+
+        })().catch((ex) => {
+        /*
+        	------------ ERROR ------------
+				{
+				 	device: "834c8b48e6254e47435d74720b1d4a13e3e57d0bf318333c284c1db8ce8ddc58",
+				 	status:500 
+				  	error: Error // An Error object containing details about the failure.
+				}
+				*/
+        console.log("exception caught", ex);
+
+        //HANDLE ERROR
+    });
+};
