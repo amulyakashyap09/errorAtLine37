@@ -1,4 +1,33 @@
 const uuidV1 = require('uuidV1');
+const AWS = require('aws-sdk');
+
+const options = {
+    THUMB_WIDTH: 120,
+    THUMB_HEIGHT: 120,
+    "s3": {
+        "bucket": "YOUR_BUCKET_NAME",
+        "accessKeyId": "YOUR_ACCESS_KEY_ID",
+        "secretAccessKey": "YOUR_SECRET_ACCESS_KEY",
+        "s3URL": "https://s3.amazonaws.com/YOUR_BUCKET_NAME/FOLDER_NAME/",
+        "s3URL2": "https://s3.amazonaws.com/YOUR_BUCKET_NAME/FOLDER_NAME/",
+        "folder": {
+            "aLarge": "large/a/",
+            "aThumb": "thumb/a/"
+        }
+    }
+};
+
+AWS.config.update({
+    accessKeyId: options.s3.accessKeyId,
+    secretAccessKey: options.s3.secretAccessKey,
+    region: "your_aws_instance_region"
+});
+
+let s3 = new AWS.S3({
+    params: {
+        Bucket: options.s3.bucket
+    }
+});
 
 const uploadAsync = function(dataFromRequest) {
 
@@ -65,7 +94,12 @@ const uploadAsync = function(dataFromRequest) {
                     bucketKeyOriginal = 'uploads/pdf/';
                     break;
                 default:
-                    file_prefix = 'INVALID'
+                    file_prefix = 'INVALID';
+                    return {
+                        statusCode: 400,
+                        customMessage: "invalid file",
+                        type: "INVALID_FILE"
+                    }
             }
 
             let id = uuidV1(); //generate attachment id
@@ -145,6 +179,7 @@ const uploadAsync = function(dataFromRequest) {
         }
     )().catch(function(ex) {
         return ex;
+        //HANDLE EXCEPTION
     });
 };
 
@@ -166,5 +201,6 @@ const createThumbnail = (path, thumbnail) => {
         }
     )().catch((ex)=> {
         return ex;
+        //HANDLE EXCEPTION
     });
 };
