@@ -1,0 +1,12 @@
+/* GENARATE RANDOM NUMBER BETWEEN MIN && MAX */
+
+const generateRandom = (min, max)=> {
+    return Promise.coroutine(function*() {
+        let num = parseInt(Math.random() * 1000000);
+        if (num > min && num < max) {
+            return num;
+        } else {
+            return generateRandom();
+        }
+    })();
+};
