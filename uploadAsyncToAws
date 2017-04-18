@@ -1,0 +1,149 @@
+const uuidV1 = require('uuidV1');
+
+const uploadAsync = function(dataFromRequest) {
+
+    /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+     any file | file over AWS account using upload
+     @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+
+    return Promise.coroutine(
+        function*() {
+
+            let file = dataFromRequest.file ? dataFromRequest.file : dataFromRequest; //file
+            let filename = file.filename; //filename of file to be uploaded
+            let path = file.path; // path of file
+            let file_type = file.headers["content-type"]; //type of file
+            let bytes = file.bytes; //size of file
+            let file_extension = filename.substring(filename.lastIndexOf('.') + 1, filename.length).toLowerCase(); //extension of file
+
+            let file_prefix = null;
+            let bucketKeyOriginal = null; //contains file in original resolution 
+            let bucketKeyThumbnail = null; //contains thumbnail of original image [ONLY REQUIRED IN IMAGE case] 
+
+            let isImage = false;
+
+            switch (file_extension) { //choose folder on aws to be uploaded
+                case 'webm':
+                case 'mkv':
+                case 'flv':
+                case 'avi':
+                case 'wmv':
+                    file_prefix = 'VID';
+                    bucketKeyOriginal = 'uploads/videos/originals/';
+                    isImage = false;
+                    break;
+                case 'jpg':
+                case 'png':
+                case 'jpeg':
+                case 'gif':
+                case 'bmp':
+                    file_prefix = 'IMG';
+                    bucketKeyOriginal = 'uploads/images/originals/';
+                    bucketKeyThumbnail = 'uploads/images/thumbnails/';
+                    isImage = true;
+                    break;
+                case 'txt':
+                case 'doc':
+                case 'docx':
+                case 'xlt':
+                case 'xls':
+                case 'ppt':
+                case 'pptx':
+                    file_prefix = 'DOC';
+                    bucketKeyOriginal = 'uploads/docs/';
+                    break;
+                case 'csv':
+                    file_prefix = 'CSV';
+                    bucketKeyOriginal = 'uploads/csv/';
+                    break;
+                case 'json':
+                    file_prefix = 'JSON';
+                    bucketKeyOriginal = 'uploads/json/';
+                    break;
+                case 'pdf':
+                    file_prefix = 'PDF';
+                    bucketKeyOriginal = 'uploads/pdf/';
+                    break;
+                default:
+                    file_prefix = 'INVALID'
+            }
+
+            let id = uuidV1(); //generate attachment id
+
+            let originalUrl = null;
+            let thumbnailUrl = null;
+            let thumbnail = null;
+
+            let url = {
+                original: originalUrl,
+                thumbnail: thumbnailUrl
+            };
+
+            let original = "ORIGINAL_" + file_prefix + '_' + filename.replace(/\.[^/.]+$/, "") + '_' + (new Date()).getTime() + '_' + '.' + file_extension;
+            original = original.replace(" ", "");
+
+            let thumbnailName = "THUMB_" + file_prefix + '_' + filename.replace(/\.[^/.]+$/, "") + '_' + (new Date()).getTime() + '_' + '.' + file_extension;
+            thumbnailName = thumbnailName.replace(" ", "");
+
+            /*-----------------------BELOW CODE UPLOADS THUMBNAIL TO AWS SERVER---------------*/
+
+            if (isImage) { //if file is image then create thumbnail
+
+                thumbnail = basePath + "/uploads/" + thumbnailName; // path inclusive of your bucket
+                yield createThumbnail(path, thumbnail) //creating thumnail if image is being uploaded
+                let thumbKey = bucketKeyThumbnail + thumbnailName;
+                let readFilesThumb = yield fs.readFileAsync(thumbnail); //reading thumbnail file 
+
+                //uplading thumnail file to server
+                yield s3.putObject({
+                    Key: thumbKey,
+                    ContentType: file_type,
+                    Body: readFilesThumb,
+                    ACL: 'public-read'
+                }).promise();
+
+                yield fs.unlinkAsync(thumbnail); //delete file from server
+
+                thumbnailUrl = "https://s3.amazonaws.com/YOUR_BUCKET_NAME/" + thumbKey;
+
+            }
+
+            let photoKey = bucketKeyOriginal + original; //path to be uploaded
+            let readFiles = yield fs.readFileAsync(file.path); //read file and convert it into buffer
+            yield s3.putObject({
+                Key: photoKey,
+                ContentType: file_type,
+                Body: readFiles,
+                ACL: 'public-read'
+            }).promise();
+
+            originalUrl = "https://s3.amazonaws.com/YOUR_BUCKET_NAME/" + photoKey; //uploaded file url
+
+            url = {
+                original: originalUrl,
+                thumbnail: originalUrl
+            };
+
+            try {
+                yield dynamoClient.put({ //save record to db
+                    TableName: "attachments",
+                    Item: {
+                        id: id,
+                        filename: filename,
+                        path: path,
+                        bytes: bytes,
+                        file_type: file_type,
+                        url: url
+                    }
+                }).promise();
+            } catch (ex) {
+                myLogger.error(ex);
+                throw ex;
+            }
+            return url;
+
+        }
+    )().catch(function(ex) {
+        return ex;
+    });
+};
