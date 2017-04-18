@@ -147,3 +147,24 @@ const uploadAsync = function(dataFromRequest) {
         return ex;
     });
 };
+
+const createThumbnail = (path, thumbnail) => {
+
+    /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+     CREATING THUMBNAIL FOR IMAGE
+     @@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+
+    return Promise.coroutine(
+        function *() {
+
+            yield imageMagick.resizeAsync({
+                srcPath: path,
+                dstPath: thumbnail,
+                width: 200,
+                height: 200
+            });
+        }
+    )().catch((ex)=> {
+        return ex;
+    });
+};
